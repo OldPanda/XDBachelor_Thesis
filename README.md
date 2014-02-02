@@ -8,6 +8,7 @@ Updates
 * 修改了页眉页脚以及边距
 * 修改了引用图片或表格时的引用格式
 * 将参考文献单独放入.bib文件中，便于管理，同时也便于通过google scholar导入
+* 我没有使用XeLaTeX编译，我的编译方法是：LaTeX==>BibTex==>LaTeX==>LaTeX
 
 原工程地址
 ----------
