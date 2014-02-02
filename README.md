@@ -12,7 +12,7 @@ Updates
 
 原工程地址
 ----------
-https://github.com/OldPanda/xdba-thesis
+https://github.com/xdlinux/xdba-thesis
 
 License 协议
 ---
