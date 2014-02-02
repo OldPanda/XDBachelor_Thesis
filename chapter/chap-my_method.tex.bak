@@ -1,0 +1,274 @@
+\chapter{基于支持向量机的背景去除方法}
+\label{chap:my_method}
+
+现今移动设备在人们的生活中迅速普及，但对于手掌图像中复杂背景去除的方法并不是尽善尽美，这就导致了手掌二值化的效果并不理想，这极大影响了掌纹识别技术的易用性，制约了掌纹识别系统在日常生活中的应用。因此迫切需要一种对各种光照、复杂背景具有鲁棒性的技术，来对图像中的前景（手掌）和背景进行分割。本文基于支持向量机算法，在图像的YCbCr空间中提取不同物体的纹理和模糊信息，同时考虑图像中每一区域的邻域信息，据此对手掌和背景进行二类分类。经大量实验证明，本方法具有较好的分类效果，同时对不同光照条件、不同的复杂背景具有鲁棒性。
+
+\section{颜色空间的选取}
+
+我们需要根据移动设备，如手机、平板电脑，拍摄的手掌图像分别提取手掌和背景的特征。人在分辨手掌和背景时的依据之一是它们之间颜色的不同，所以本文的第一步工作就是进行颜色空间的选取。RGB颜色空间是最直观，也是可以从图像中直接获得的颜色信息，由于它的使用简便，在很多基于肤色检测的掌形分割\cite{doublet2006contact, poinsot2009small}的文献中都使用了这个颜色空间，其中Poinsot\cite{poinsot2009small}假设红色分量在手掌区域更加集中而在背景中很少出现，这样两者的颜色就有了很大的对比。为了减少RGB空间对光照强度的依赖，后来又提出了标准rgb空间\cite{kakumanu2007survey}（$r+g+b=1$）。实验表明\cite{yang1997skin, yang1999gaussian}，肤色在标准rgb空间上的聚合度高于在RGB空间上，即肤色在标准rgb空间上有更低的方差，因此较之RGB空间，标准rgb 空间对肤色检测来说是一个更好的选择。但是在实际应用中，无论是RGB空间还是标准rgb空间，由于三个颜色分量都包含着亮度信息，所以不可避免的会受到外界光照的影响，导致分类的性能并不理想。
+
+为了应对RGB空间的光照敏感性，由RGB进行变换而得到的YCbCr空间随之被提出。YCbCr颜色空间由RGB通过\eqref{eq:RGB2YCC}变换得来，Y 代表光照强度，Cb代表蓝色色度，Cr代表红色色度，见图\ref{fig:SceneYCC}。从图中可以看出，图像的Y分量的呈现形式即为图像的灰度空间，表示图像中的光照强度，而Cb和Cr两个分量单纯的表示蓝色分量和红色分量，这样就避免了光照在肤色检测过程中的干扰。因为该空间中光照和颜色之间具有很好的分离度，所以本文的方法采用YCbCr颜色空间。虽然Y作为光照分量，是不同环境、不同背景下的图像中变化最大的一种信息，但经过实验表明\cite{kakumanu2007survey}，盲目的去除Y分量将会导致检测性能的大幅下降，而收到的对光照具有鲁棒性的效果却不是很理想，因此在本文的方法中保留了Y分量。
+\begin{figure}[tbp]
+    \centering
+    \subfigure{\includegraphics[width=0.2\textwidth]{Scene.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{SceneY.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{SceneCb.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{SceneCr.jpg}}
+    \caption{某图片及其Y、Cb、Cr分量图像} \label{fig:SceneYCC}
+\end{figure}
+
+\section{图像特征的提取}
+
+\subsection{纹理特征和模糊特征}
+\label{subsec:3_texture&haze}
+
+接下来的工作是在YCbCr空间中提取出最有利于进行手掌/背景分类的特征。从某种角度上来说，判断前景与背景，实质上是对图像中物体的距离远近进行判断。在掌纹图像中，最近的部分便是手掌，其他部分皆为背景，我们只需要找出距离最近的物体，即手掌，就可以完成对背景的去除。
+
+对人类来说，在一幅照片中判断不同物体的距离是很简单的一件事情\cite{loomis2001looking}。通常我们判断单张图片中物体距离远近的依据是物体的纹理、遮挡、模糊程度、已知物体的尺寸等信息\cite{michels2005high, saxena2006learning}，比如说，同一个物体的纹理在不同的距离上观察到的是不一样的，远近不同的物体的纹理也不相同。而模糊是由大气散射造成的一种现象，我们可以通过判断一个物体在图像中的模糊程度来判断其距离的远近。根据我们的经验，手掌的纹理一般情况下和周围的背景是不相同的，因此可以通过纹理来判断手掌的位置。对计算机来说，谈不上已知物体的尺寸，故而舍弃不用。在本文的工作中，一般手和摄像头的距离不会超过30厘米，而背景物体的距离一般大于50厘米，因此可以利用两者间纹理特征和模糊特征的不同来对它们作出区分，从而构造凡是手掌，我们认为是“近”；凡是背景，我们认为是“远”的二类分类问题。
+
+物体的纹理特征一般集中在光照强度分量上（即Y分量），模糊信息一般由颜色分量（即Cb和Cr分量）中的低频信息反映出来。所以我们利用Laws masks 滤波模板\cite{laws1980textured}对图像的Y分量进行滤波以获取纹理特征，用局部均值滤波模板对Cb和Cr分量进行滤波以获取模糊特征\cite{michels2005high}。在这里我们使用由Laws' masks三个一维向量通过卷积计算得到的九个$3\times3$模板对图像进行滤波。三个一维向量如\eqref{eq:Laws}所示。
+\begin{equation}\label{eq:Laws}
+  \left\{
+    \begin{aligned}
+        L_3&=\left[ \ 1 \quad 2 \quad \ 1 \right]\\
+        E_3&=\left[ \textnormal{-}1 \quad 0 \quad \ 1 \right]\\
+        S_3&=\left[ \textnormal{-}1 \quad 2 \quad \textnormal{-}1 \right]
+    \end{aligned}
+  \right.
+\end{equation}
+其中${L}_{3}$、${E}_{3}$、${S}_{3}$分别用于描述灰度级、边缘和斑点。通过这三个$1\times3$向量生成的九个滤波模板如图\ref{fig:Laws}所示。
+\begin{figure}
+  \centering
+  \includegraphics[width=0.6\textwidth]{Laws.jpg}\\
+  \caption{九个Laws’ masks滤波模板}
+  \label{fig:Laws}
+\end{figure}
+我们用这些模板对图像进行滤波，以获得代表着图像纹理信息和模糊信息的特征。为了说明方便，这里用${I}_{Y}$、${I}_{Cb}$和${I}_{Cr}$分别代表某一像素的光照强度值、蓝色色度值和红色色度值。具体来讲，在本文中应用九个滤波模板分别和${I}_{Y}$进行卷积计算得到该点的纹理特征，应用第一个滤波模板（即${L}_{3}*{L}_{3}^{'}$）分别和${I}_{Cb}$、${I}_{Cr}$分量进行卷积计算得到该点的模糊特征，这样我们就能获得对于一个像素点的11个滤波结果，计算过程见\eqref{eq:LawsFilter}。
+\begin{equation}\label{eq:LawsFilter}
+  \left\{
+    \begin{aligned}
+        {I}_{n}&={I}_{Y}*{M}_{n},\quad n=1,2,...,9\\
+        {I}_{10}&={I}_{Cb}*{M}_{1}\\
+        {I}_{11}&={I}_{Cr}*{M}_{1}
+    \end{aligned}
+  \right.
+\end{equation}
+其中${M}_{n}$表示第n个滤波模板。为了提高计算上的效率，同时为了尽可能包含更多的特征，使得学习算法的分类有更强的置信度，本文将一张图片分成一个个的小区域来进行特征的提取。所以本方法在计算出每个像素的11个纹理特征及模糊特征之后，对每一个小区域$i$进行特征计算，特征向量生成的具体过程由\eqref{eq:PatchFeature}给出。
+\begin{equation}\label{eq:PatchFeature}
+  {F}_{i}=\sum _{(x,y)\in patch(i)}{I(x,y)}
+\end{equation}
+其中$I(x,y)$表示坐标为$(x,y)$的像素点的特征向量（$1\times11$维）。现在给出通过Laws' masks模板滤波后的特征图像（见图\ref{fig:FilterResult}），直观上来看，第二张图片和最后两张图片中的手掌部分相对于背景更加明显。但由于特征间不可避免的存在重复信息，造成特征信息冗余，从而导致分类性能下降，同时在机器学习问题中最为关键的一步就是对特征组合的调整，因此最终特征的选取还需要大量的特征组合实验来确定。
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.0\textwidth]{FilterResult.jpg}\\
+  \caption{示例图像及其滤波结果，其中第一张为原图，后面11张分别对应通过Laws' masks所得的11个滤波结果}\label{fig:FilterResult}
+\end{figure}
+
+\subsection{邻域信息}
+
+生活经验告诉我们，图像中的某一个小区域是不可能独立存在的，也就是说，某一特定区域中的内容是和它的邻域内容密切相关的（见图\ref{fig:PatchNeighbor}）。
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.8\textwidth]{PatchNeighbor.jpg}\\
+  \caption{区域P0及其四个邻域}\label{fig:PatchNeighbor}
+\end{figure}
+具体来说，在手掌背景去除问题中，某一区域$i$可以由它的四个邻域的信息来判断它的分类。举例来说，如果一个区域的四周邻域全部是手掌，那么毫无疑问，我们可以确认这个区域也属于手掌。如果它的大部分邻域在背景中，那么它有极大的可能也属于背景一类。在图\ref{fig:PatchNeighbor}中，P0的邻域中，P2、P4属于手掌部分，P1的大部分属于手掌，P3属于背景，所以我们有更大的把握判断P0属于手掌区域，尽管实际上有小部分是背景。因此我们考虑将某一区域的邻域纹理特征及模糊特征加入该区域的特征向量，以增大对该区域正确分类的概率。
+
+\subsection{特征小结}
+
+通过以上论述，我们在YCbCr空间提取了图像中每一区域的纹理特征和模糊特征，并与该区域的邻域特征共同组成该区域的特征向量。由于在YCbCr空间上肤色集中在某一特定的区域，同时YCbCr空间对光照的鲁棒性，以及在本文的问题中前景与背景在纹理、模糊上的差别，可以确信本文对特征的提取是合理的，我们的实验也证明了这一点。由于11个滤波特征存在信息重复，从而导致特征信息上的冗余问题，还需要进行特征组合实验，来得到性能最优的特征组合。
+
+\section{分类算法：支持向量机}
+
+根据第二部分提到的，目前的基于机器学习的背景去除方法大部分使用的是人工神经网络，虽然神经网络已经被用于很多领域并获得了成功，但它仍不可避免的存在一些缺陷：
+\begin{itemize}[itemsep=0ex]
+  \item 神经网络的网络结构需要预先指定，即网络的层数，每层的节点数的确定需要人工参与。一般来说，都是通过经验来判定这些数值，稍有不同就会影响神经网络的性能。
+  \item 神经网络本身是基于Logistic Regression的一种寻优算法，这就使得神经网络很容易陷入局部最优，甚至无法得到最优解。
+  \item 神经网络模型的性能依赖于学习样本，即如果训练样本很小或者样本在样本空间中很集中，那么它就只能对这一部分作出预测，在样本空间其他位置的预测样本则不能被很好的分类。
+\end{itemize}
+
+考虑问题的实际情况，本文使用支持向量机算法作为分类器。支持向量机是基于统计理论的一种机器学习算法\cite{vapnik1999nature}，无需经验的参与，这样就保证了支持向量机的性能不受人们的经验所左右。经过严格的数学证明，支持向量机最终可以转化为一个凸优化问题，这样就保证了算法得到的最优解一定是全局最优。由于支持向量机的理论基础是结构风险最优化，这就使得它具有很好的泛化能力，即使是很小的训练样本，它也能对未知数据作出比较好的预测，在我们的实验中也证明了这一事实，而传统的统计方法只有在训练数据趋近于无穷的情况下才能得到理想的结果。综上所述，在本文中选择支持向量机作为分类算法。
+
+\subsection{支持向量机简介}
+
+在本节给出支持向量机（Support Vector Machine，SVM）学习算法的一个简介。SVM是由Vapnik提出的一种由统计理论发展而来的学习算法，由于它在分类方面出色的性能，应对高维数据空间的能力及可以避免陷入局部最优解，它被广泛用于各种分类问题，比如说人脸识别\cite{phillips1998support}、 图像类型分类\cite{chapelle1999support}及垃圾邮件分类\cite{drucker1999support}等。
+
+作为一种监督学习算法，首先要用大量的样本对SVM进行训练，之后用得到的模型对测试样本集进行测试来对模型的性能进行评价。SVM的输入为训练集${({x}_{i},{y}_{i})}_{1\le i\le m}$，其中${x}_{i}\in {R}^{n}$，为训练样本中的特征，$n$代表问题空间的维度，$m$代表训练样本的个数；相对应的，${y}_{i}$表示标记为$+1$或者$-1$的目标。算法的目的是找到一个超平面（也叫决策平面），可以把训练样本集中的样本根据${y}_{i}$值分为两部分，同时也可以对未知分类的样本进行正确分类。这样一个超平面可以表示为\eqref{eq:svm1}的形式。
+\begin{equation}\label{eq:svm1}
+  {w}^{T}x+b=0
+\end{equation}
+式中$w$为一个与超平面互相垂直的向量。当训练集线性可分时，我们总可以找到一个$(w,b)$值使得\eqref{eq:svm2}成立，即找到可将所有样本正确分类的超平面。
+\begin{equation}\label{eq:svm2}
+  {y}_{i}(w\cdot {x}_{i}+b)> 0,\quad i=1,...,m
+\end{equation}
+下面介绍间隔的概念。间隔在SVM中扮演着重要的角色，在这里，为了说明方便，间隔只表示几何间隔，即样本空间中的某一点到分类超平面的距离。对某一特定样本来说，它到超平面的间隔越大，那么对该样本正确分类的置信度越大。为了得到使得所有样本分类置信度最大的超平面，我们需要使得两个类别中的样本到超平面的最小间隔最大。为了获得这个超平面，我们需要求解\eqref{eq:svm3}的最优化问题。
+\begin{equation}\label{eq:svm3}
+  \underset {1\le i\le m}{max} \frac {{y}_{i}(w\cdot {x}_{i}+b)}{\left\| w \right\|}
+\end{equation}
+其中$\left\| w \right\|$为$w$的欧几里德范数。为了将问题简化，将函数距离${y}_{i}(w\cdot {x}_{i}+b)$固定为1，\eqref{eq:svm3}可以转化为\eqref{eq:svm4}。
+\begin{equation}\label{eq:svm4}
+\begin{split}
+  &min\frac {1}{2} {\left\| w \right\|}^{2} \\
+  &s.t.\quad {y}_{i}(w\cdot {x}_{i}+b)\ge 1,\quad i=1,...,m
+\end{split}
+\end{equation}
+这样，我们就把要求解的问题转化为了一个凸优化问题，而凸优化问题的解一定是全局最优解，这就是支持向量机能够避免陷入局部最优的原因所在。对于该有约束的凸优化问题，可以用拉格朗日乘子法来求解（见\eqref{eq:svm5}）：
+\begin{equation}\label{eq:svm5}
+  \underset {w,b}{min} L(w,b,\alpha)=\frac {1}{2}{\left\| w \right\|}^{2}-\sum _{i=1}^{m}{{\alpha}_{i}} \left[ {y}_{i}\left( w\cdot {x}_{i}+b \right) -1 \right]
+\end{equation}
+其中${\alpha}_{i}\ge 0$是拉格朗日乘子。因为需要求极值，所以使得\eqref{eq:svm5}中$w$和$b$的梯度等于0，如\eqref{eq:svm7}和\eqref{eq:svm8} 所示。
+\begin{eqnarray}
+  \frac {\partial L}{\partial w} &=&w-\sum _{i=1}^{m}{{\alpha}_{i}{y}_{i}{x}_{i}}=0\Rightarrow w=\sum _{i=1}^{m}{{\alpha}_{i}{y}_{i}{x}_{i}}\label{eq:svm7}\\
+  \frac {\partial L}{\partial b} &=&\sum _{i=1}^{m}{{\alpha}_{i}{y}_{i}}=0\quad \quad \quad \Rightarrow \sum _{i=1}^{m}{{\alpha}_{i}{y}_{i}=0}\label{eq:svm8}
+\end{eqnarray}
+将\eqref{eq:svm7}与\eqref{eq:svm8}代入\eqref{eq:svm5}，就可以得到一个典型的凸二次优化问题（见\eqref{eq:svm6}）。
+\begin{equation}\label{eq:svm6}
+\begin{split}
+    &max\quad W(\alpha)=\sum_{i=1}^{m}{{\alpha}_{i}}-\frac {1}{2}\sum_{i,j=1}^{m}{{\alpha}_{i}{\alpha}_{j}{y}_{i}{y}_{j}({x}_{i}\cdot {x}_{j})} \\
+    &s.t.\quad \sum_{i}^{m}{{\alpha}_{i}{y}_{i}}=0,\quad {\alpha}_{i}\ge 0,i=1,2,...,m
+\end{split}
+\end{equation}
+这样，只需要求解拉格朗日乘子${\alpha}_{i}$即可，减少了计算量。
+
+当训练集线性不可分时，可以通过核函数技术将训练样本扩展到高维空间，使得训练集在高维空间中线性可分，再进行求解。核函数（Kernel\ $K({x}_{i},{x}_{j})=\left< \Phi({x}_{i}),\Phi({x}_{j})\right>$满足Mercer条件。这样扩展后的优化问题如\eqref{eq:svm10} 所示。
+\begin{equation}\label{eq:svm10}
+\begin{split}
+    &max\quad W(\alpha)=\sum_{i=1}^{m}{{\alpha}_{i}}-\frac {1}{2}\sum_{i,j=1}^{m}{{\alpha}_{i}{\alpha}_{j}{y}_{i}{y}_{j}K({x}_{i},{x}_{j})} \\
+    &s.t.\quad \sum_{i}^{m}{{\alpha}_{i}{y}_{i}}=0,\quad {\alpha}_{i}\ge 0,i=1,2,...,m
+\end{split}
+\end{equation}
+比较常用的核函数有：
+\begin{enumerate}[itemsep=0ex]
+  \item 线性核：$K(x,y)=x\cdot y$
+  \item 多项式核：$K(x,y)={\left[(x\cdot y)+c\right]}^{d},c\ge 0$
+  \item 高斯（径向基函数）核：$K(x,y)=exp\left\{\frac {{-\left\| x-y \right\|}^{2}}{2{\sigma}^{2}}\right\}$
+  \item 两层神经网络核：$K(x,y)=\tanh{\left[K(x\cdot y)-\delta\right]},k>0$
+\end{enumerate}
+经过上述推导，可以得到非线性支持向量机学习算法：\\
+\begin{algorithm}[H]
+\zihao{5}
+\caption{非线性支持向量机学习算法}
+\label{algo:svm}
+\KwIn训练集$T=\{(x_1,y_1),(x_2,y_2),...,(x_N,y_N)\}$，其中$x_i\in R^n$，$y_i\in \{-1,+1\}$，$i=1,2,...,N$\\
+\KwOut分类决策函数\\
+（1）选取适当的核函数$K({x}_{i},{x}_{j})$和参数C，构造支持向量机的对偶形式，并求解\eqref{eq:algo1}
+\begin{equation}\label{eq:algo1}
+\begin{split}
+    &max\quad W(\alpha)=\sum_{i=1}^{m}{{\alpha}_{i}}-\frac {1}{2}\sum_{i,j=1}^{m}{{\alpha}_{i}{\alpha}_{j}{y}_{i}{y}_{j}({x}_{i}\cdot {x}_{j})} \\
+    &s.t.\quad \sum_{i}^{m}{{\alpha}_{i}{y}_{i}}=0,\quad 0\le {\alpha}_{i}\le C,i=1,2,...,m
+\end{split}
+\end{equation}
+求得最优解${\alpha}^{*}=(\alpha_1^*,\alpha_2^*,...,\alpha_N^*)^T$。\\
+（2）选择$\alpha^*$的一个正分量$0<{\alpha}_{j}^{*}<C$，计算$b^*=y_i-\sum_{i=1}^N{\alpha_i^* y_i K(x_i\cdot x_j)}$\\
+（3）从而得到决策函数：$f(x)=sign(\sum_{i=1}^N{\alpha_i^* y_i K(x_i\cdot x_j)}+b^*)$
+\end{algorithm}
+从算法\ref{algo:svm}可以看出，\eqref{eq:algo1}是凸二次规划问题，存在全局最优解。
+
+支持向量机算法对样本进行二类分类的例子由图\ref{fig:svm}的实验结果给出。可以看出，即使是在比较复杂的非线性情况下，支持向量机通过高斯核（可扩展到无限维）也能够对样本进行有效分类。
+\begin{figure}[H]
+    \begin{center}
+    \subfigure{\includegraphics[width=0.4\textwidth]{svm1.jpg}}
+    \subfigure{\includegraphics[width=0.4\textwidth]{svm2.jpg}}
+    \end{center}
+    \caption{用支持向量机进行二类分类的例子。左图为线性可分的情况，右图为线性不可分的情况，使用了高斯核将样本扩展到了高维空间} \label{fig:svm}
+\end{figure}
+
+\subsection{支持向量机的应用}
+
+在手掌图像背景去除的问题中，由于本文选取的特征个数较多以及分类面（即手掌轮廓）较复杂，本文选择可以将支持向量机扩展到无限维的高斯核函数$K(x,y)=exp\left\{\frac {{-\left\| x-y \right\|}^{2}}{2{\sigma}^{2}}\right\}$。具体的训练阶段和测试阶段的流程如图\ref{fig:TrainTest}所示\footnote[1]{在特征分析实验中（\ref{sec:4_feature_analysis}部分），本文使用的是Python的Scikit Learn库\cite{pedregosa2011scikit}，在性能评估实验中（\ref{sec:4_neighbor}部分及\ref{sec:4_final}部分），本文使用的是LIBSVM 库\cite{chang2011libsvm}。}。
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{Train_Test.jpg}\\
+  \caption{本文方法的流程}\label{fig:TrainTest}
+\end{figure}
+我们把图像中的每一个小区域作为一个样本，特征向量根据\eqref{eq:PatchFeature}得出，目标值${y}_{i}\in \left\{+1,-1\right\}$由手动标记，不同的值表示不同的分类。由于在样本数据库中的背景背景可以分为几个类别，比如说，以电脑为主的背景，以桌面为主的背景等，本文在实验中确保每一种类别的背景都得到了训练。同时，为了避免因为训练最后几张同种背景类别的图片导致的高偏移，训练样本的输入顺序是随机的。
+
+由于在样本量很大时，求解凸二次规划问题就会变得非常低效，在本文的问题中训练样本空间大小在百万级别，因此本文使用序列最小最优化（sequential minimal optimization，SMO）的方法来加快训练速度。
+
+\section{本文方法的具体实现}
+
+据上文的分析过程，本文的实现分为Laws' masks滤波、整合邻域信息、支持向量机分类三部分，由于支持向量机算法本文使用的是Python的Scikit Learn 库及LIBSVM库，本文在分类算法的实现上主要集中在特征数据与目标数据的处理上。在Laws' masks滤波及整合邻域信息部分本文使用matlab语言实现，在数据处理部分使用Python语言实现。
+
+\subsection{滤波部分}
+在图像的特征提取及处理部分使用Matlab语言实现。对图像进行背景去除的第一步为Laws' masks滤波\cite{saxena2006learning, saxena2007learning, michels2005high, make3D}：
+\begin{lstlisting}[caption=滤波模板定义, label=code:LawsMasks]
+MatrixConditioner = .2;
+L3 = [1 2 1]/128/MatrixConditioner;
+E3 = [-1 0 1];
+S3 = [-1 2 -1];
+\end{lstlisting}
+代码\ref{code:LawsMasks}为本文对Laws' masks的实现，滤波操作由代码\ref{code:Filter1}给出：
+\begin{lstlisting}[caption=对图像的Y分量用第一个模板进行滤波, label=code:Filter1]
+temp = conv2(imgY, L3'*L3, 'valid');
+temp = [ temp(1*ones(1,round((size(L3,2)-1)/2)),:); temp;...
+             temp(end*ones(1,(size(L3,2)-1-round((size(L3,2)-1)/2))),:)];
+H(:,:,1) = [temp(:,1*ones(1,round((size(L3,2)-1)/2))) temp...
+            temp(:,end*ones(1,(size(E3,2)-1-round((size(E3,2)-1)/2))))];
+\end{lstlisting}
+其中H(:, :, 1)表示图像通过Laws' masks模板滤波所得的第一个特征，对应于\eqref{eq:LawsFilter}中$n=1$的情况，其他10个特征的提取过程与之类似。
+\begin{lstlisting}[caption=特征组合, label=code:FeatureCom]
+patch_H1 = patchimg(H(:,:,1),m,n);
+patch_H2 = patchimg(H(:,:,2),m,n);
+            .
+            .
+            .
+patch_H11 = patchimg(H(:,:,11),m,n);
+\end{lstlisting}
+代码\ref{code:FeatureCom}将11个特征分开来获取，便于进行之后的特征组合实验。其中patchimg为本文实现的将图像分块的方法，如前文所述，这样可以加快训练速度，同时尽可能在样本中包含尽可能多的信息，增大分类置信度。m和n表示分块的长宽像素值，一般取m=3，n=3。
+
+\subsection{邻域信息的整合}
+
+加入邻域信息的前提是将每个小区域的特征通过滤波得出，之后对每一区域进行邻域信息的添加，这里的邻域信息即为该区域上下左右四个区域的特征。具体实现时根据某一区域的坐标即可得到其邻域信息。实现过程如下：
+\begin{lstlisting}[caption=邻域信息的整合, label=code:neighbor]
+function [y] = featureVectornew(x,posX,posY)
+    y(1)=x(posX,posY);
+    y(2)=x(posX,posY-1);
+    y(3)=x(posX,posY+1);
+    y(4)=x(posX-1,posY);
+    y(5)=x(posX+1,posY);
+end
+\end{lstlisting}
+其中x为某区域的特征向量，posX和posY表示该区域的坐标值，返回值y即为加入邻域信息后的特征向量。
+
+\subsection{训练数据的处理及支持向量机的应用}
+
+为了方便运行支持向量机算法，本部分代码用Python语言实现。根据本文实现得到的特征文件为“height×width×特征数”的矩阵，而支持向量机支持的数据格式为“样本数× 特征数”的矩阵，因此需要对特征数据进行处理，其中用到了scipy包，以读取matlab生成的.mat格式文件。
+\begin{lstlisting}[caption=训练数据的处理, label=code:dealFeaData, language=Python]
+# load feature data
+f_data = loadmat(f_filename, mat_dtype = True, matlab_compatible = True)
+feature = []
+feature_mat = list(f_data['feature'])
+for i in range(1, height - 1):
+     for j in range(1, width - 1):
+         feature.append(feature_mat[i][j])
+\end{lstlisting}
+程序读取特征文件，得到特征矩阵，根据图片的长宽（以块为单位）来逐块读取特征向量，从而可以得到“样本数×特征数”的矩阵。在for循环中，由于之前加入了邻域信息，导致在图像边缘部分的分块的邻域是残缺不全的（只有两个邻域或三个邻域），因此在构建特征矩阵的过程中忽略了边缘部分。与之相对应的，在目标值向量的构造中也去除了边缘的目标信息：
+\\
+\begin{lstlisting}[caption=目标数据的处理, label=code:dealTarData, language=Python]
+# load target data
+t_data = loadmat(t_filename, mat_dtype = True, matlab_compatible = True)
+target_mat = t_data['target']
+t_temp = target_mat[1:height-1, 1:width-1]
+# reshape the target matrix to a 1*m vector
+t_temp = np.reshape(t_temp, (1, -1))
+target = t_temp[0].tolist()
+\end{lstlisting}
+由于目标矩阵为“height×width”的矩阵，只需要对其进行reshape操作即可。这样就得到了feature和target两个list，之后就是对支持向量机的训练：
+\begin{lstlisting}[caption=训练支持向量机, label=code:svmTrain, language=Python]
+clf = svm.SVC(probability = True)
+clf.fit(feature, target)
+\end{lstlisting}
+在这里使用了Python的Scikit Learn库中的SVC（support vector classification）类，设置为可以输出分类置信概率，便于对结果进行分析和调试，这里的clf就是训练得到的模型，在进行预测时可通过给定的feature给出label值：
+\begin{lstlisting}[caption=用训练得到的模型进行预测, label=code:svmPre, language=Python]
+# deal with the feature data of a test image
+for i in range(height):
+    for j in range(width):
+        # make prediction according to feature data
+        target_pre.append(clf.predict(feature_mat[i][j]))
+\end{lstlisting}
+其中clf.predict()方法可以根据特征数据得到预测的目标值，最终得到的target\_pre为预测目标值的list，可保存为.mat文件，方便性能的评估和结果的查看。
+
+
+\section{本章小结}
+
+在本章中首先介绍了本文选取颜色空间的标准，然后是提取图像的纹理及模糊特征，最后介绍了支持向量机算法以及和神经网络算法的比较。特征选取是机器学习问题中最重要的一个环节，而从图像中直接提取出的特征之间不可避免的存在重复信息，从而造成信息的冗余，所以针对Laws' masks 模板滤波得出的11个特征还需要进行大量的特征组合实验，以得到最好的分类性能。支持向量机算法能够避免陷入局部最优，从而保证了得到的结果一定是唯一的，并且是有最佳性能的。同时使用支持向量机不需要像神经网络那样依赖于经验来构造网络，不会因为人的经验不同而导致性能上的差别。最后给出了对本文方法的具体实现，使用了matlab和Python语言，可以提高原型开发的效率，便于进行实验。

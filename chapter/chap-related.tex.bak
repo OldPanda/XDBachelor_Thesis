@@ -1,0 +1,64 @@
+\chapter{手掌图像背景去除}
+
+在掌纹图像预处理阶段需要从手掌图像中区分出手掌区域，继而进行关键点的确定，定位ROI区域，之后进行特征的提取和匹配。而预处理的第一步就是图像中背景的去除，背景去除的效果对后期掌纹特征的匹配效果起到重要作用。关于背景去除的方法，人们进行了一定的研究，作出了一些较有成效的工作。
+
+\section{固定阈值法}
+
+前人对手掌图像中背景的去除做了大量研究，提出了许多方法。最早手掌图像的获取通过油墨法，即将手掌涂满油墨在白纸上印下手掌的纹路，这种方法只需要界定白色部分为背景，其余部分为手掌即可。由于油墨法的不便，人们更多使用的是联机获取方式。之后\cite{zhang2003online, han2004hand, li2002palmprint, kong2003palmprint}手掌图像都是通过基于CCD的摄像设备采集的，如图\ref{fig:CCD}，这种情况下背景单一固定，使用固定阈值法就可以将手部区域从背景中分离出来。计算公式见式\eqref{eq:threshold}，其中$I(x,y)$表示图像坐标为$(x,y)$像素的灰度值，$\theta$表示区分手掌区域和背景区域的阈值。
+\begin{equation}\label{eq:threshold}
+  y=\begin{cases} 1,\quad if\ I(x,y)\ge \theta  \\ 0,\quad if\ I(x,y)<\theta  \end{cases}
+\end{equation}
+\begin{figure}[H]
+    \centering
+    \subfigure{\includegraphics[width=0.2\textwidth]{CCD1.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{CCD2.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{CCD3.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{CCD4.jpg}}
+    \caption{基于CCD的摄像设备采集的手掌图像} \label{fig:CCD}
+\end{figure}
+
+\section{动态阈值法}
+
+由于背景往往不是固定的，而是包含有很多无规则的物体，其中的光照条件也各不相同，这时固定阈值法就不再适用。人们提出了基于颜色分布直方图的动态阈值方法，即动态地在颜色分布直方图中找到一个点，能够正确地将手掌和背景分开。Nobuyuki Otsu于1975年提出了大津法\cite{otsu1975threshold}，现在许多文献中\cite{zhu2009research, poinsot2009small}使用这种方法进行手掌与背景的区分。大津法基于这样一种假设：在图像的灰度空间上，目标物体和背景的灰度值服从正态分布。具体来讲，在灰度值分布图上，这个方法可以在分别代表目标物体和背景的两个灰度峰值之间找到一个最低点作为阈值，以这一点为分界点将目标和物体分离开，使得物体和背景两类之间类内距离最小，类间距离最大。Zhu\cite{zhu2009research}先对图像进行中值滤波消除噪点，然后应用大津法来找到分割手与背景的阈值，这样可以有效去除图像噪声带来干扰，使得分割更为准确。Poon\cite{poon2004new}使用手掌和背景的统计信息并应用动态阈值法来进行背景的去除，在他的方法中，由于背景的光照强度较弱，背景较单一，因此分割效果较好。
+\begin{figure}
+    \centering
+    \subfigure{\includegraphics[width=0.2\textwidth]{Otsu2.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{otsu-2.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{Otsu4.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{otsu-4.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{3.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{otsu3.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{16.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{otsu16.jpg}}
+    \caption{用大津法对图像进行背景去除的结果。第一行为较简单背景的情况；第二行为复杂背景的情况，照片来自本文自建数据库} \label{fig:Otsu}
+\end{figure}
+
+本文实现了大津法并用数据库中的图片进行实验。图\ref{fig:Otsu}给出通过大津法进行背景去除的结果。从图中可以看出，在背景简单的情况下，大津法非常适于背景去除，如第一行。但如果背景过于复杂，如第二行所示，经过大津法处理的结果就很不理想。因为背景复杂时图像中包含的灰度值范围很大，大津法就不容易确定准确的阈值。而在我们的日常生活中，通常都是较复杂的背景，经过上述分析及实验结果可以看出，大津法难以适应日常场景的变化。
+
+\section{基于机器学习的方法}
+
+机器学习是上世纪末兴起的一门交叉学科，涉及线性代数、概率论、统计学、凸优化等多门学科，是人工智能的一个分支领域。对机器学习算法的研究目的是使得计算机像人类一样拥有自动“学习”的能力\cite{blum2007machine}，无论是监督学习还是非监督学习，机器学习算法都是通过分析已有的数据，进而得出规律推理未知的数据。因此，许多研究者提出了基于机器学习算法的手掌图像前景背景分割的方法。
+
+作为机器学习的算法之一，人工神经网络以其自我学习、能够处理输入输出复杂关系、根据输入特征将样本准确分类的能力著称。在这里，输入为从手掌和背景像素中提取的特征，输出为判断该像素点属于哪一类（手掌/背景）。2006年，Doublet\cite{doublet2006contact}提出了在RGB空间对手掌图像进行分割的方法。即将图像中的每个像素的RGB值作为特征，该像素点的分类作为目标来对反向传播（Backpropagation，BP）神经网络进行训练，之后用训练得到的模型对未知的像素点进行分类，见图\ref{fig:RGBNN}。
+\begin{figure}[H]
+  \centering
+  % Requires \usepackage{graphicx}
+  \includegraphics[width=0.6\textwidth]{RGBNN.jpg}\\
+  \caption{神经网络映射计算\cite{doublet2006contact}}\label{fig:RGBNN}
+\end{figure}
+经过实验，该方法确实能够通过每个像素点的RGB值来判断该点为手掌或者背景的概率，但就分割结果来看，手掌图像的细节处理并不是很好，比如说手指缝间的背景去除效果就不是那么理想，导致关键点定位的困难。Yoruk\cite{yoruk2006shape}提出了使用Kmeans聚类算法在灰度空间和RGB空间对手掌图像进行分割的方法。作为一种非监督学习算法，Kmeans算法的思想是将样本集分为K类，通过不断迭代聚类中心的方式使得类内距离最小，类间距离最大。由于Yoruk的实验环境较为简单，背景总是比手掌区域稍暗一些，并且场景比较单一，所以严格来说，该方法并不适用于背景复杂、光照强度变化较大的情况。
+
+为了减少RGB颜色空间中的信息冗余和光照敏感性，人们提出了YCbCr颜色空间。由于在YCbCr空间上光照强度和色度是相互独立的，所以它更适于图像像素特征的提取。Y分量是RGB值的加权和，Cb和Cr分量由分别从B和R值中减去Y分量得出，代表蓝色色度和红色色度。RGB和YCbCr的转换关系可表示为式\ref{eq:RGB2YCC}。
+\begin{equation}\label{eq:RGB2YCC}
+  \begin{bmatrix} Y \\ Cb \\ Cr \end{bmatrix}=\begin{bmatrix} 16 \\ 128 \\ 128 \end{bmatrix}+\begin{bmatrix} 65.481 & 128.553 & 24.966 \\ -37.797 & -74.203 & 112.000 \\ 112.000 & -93.786 & -18.214 \end{bmatrix}\begin{bmatrix} R \\ G \\ B \end{bmatrix}
+\end{equation}
+
+M.O.Rotinwa等\cite{rotinwa2011novel}提出了在YCbCr空间上的掌形分割学习方法。他们用Cb和\\Cr作为像素特征，去掉Y分量以尽量消除光照强度对图像的影响，用三层反向传播（Backpropagation，BP）神经网络进行训练，之后用训练得到的模型参数和Kmeans聚类算法对测试集图片进行二类分类，从而得到背景去除后的手掌部分。但由于去掉光照强度分量之后会降低肤色检测的性能\cite{kakumanu2007survey}，因此该方法的应用范围十分有限，在背景稍复杂的情况下就无法得出很好的掌形。
+
+另一种基于统计信息的机器学习方法——AdaBoost算法\cite{freund1996experiments}，因为其优秀的分类性能，在很多领域得到了应用，如判断音乐的流派\cite{bergstra2006aggregate}、 车辆检测\cite{khammari2005vehicle}、人脸识别\cite{zhou2006face}等。AdaBoost算法基于这样一种思想：多个分类器共同对一个样本进行分类，要比一个分类器来进行这个任务的性能好。即分别训练N个弱分类器，再由这些弱分类器组成一个强分类器。Y Han\cite{han2007palmprint}将AdaBoost算法用于复杂背景下的掌形分割。在该方法中，Han提取了图像的Haar特征，用训练集中的手掌形状来对AdaBoost进行训练，以便选出最有效的Haar特征用于级联分类器\cite{ong2004boosted}。 但在该方法中仍然需要专门的图像采集设备将手掌部分照亮，以保证分割效果，并不适用于普通手持设备。
+
+\section{本章小结}
+
+随着移动设备的逐渐流行，出于对信息安全的考虑，在移动设备上应用掌纹识别技术是大势所趋，例如在今年的CeBIT展上，富士通公司展示了可以进行掌纹识别的平板电脑原型机，但该平板进行掌纹识别仍需要特定的采集设备，这无疑大大增加了使用成本，并且限制了掌纹设别技术在日常生活中的普及。考虑普通手机或者平板电脑的情况，图像的采集是通过摄像头完成的，而摄像头拍摄的手掌图像不可避免的包含各种不同的背景、不同的物体、不同的光照条件，所以背景的去除效果直接影响着掌纹特征的匹配，间接决定了这项生物识别技术的普及。
+
+本章介绍了关于掌纹预处理阶段的掌形分割基础，从最初的油墨法到动态阈值法，再到可以应对较复杂背景的机器学习方法。尽管分类方法越来越智能，但在日常生活的场景中仍然不适用，限于此，掌纹识别这种安全方便的身份认证技术没有能够真正普及起来，我们仍然需要一种对光照、背景具有鲁棒性的背景去除方法。

@@ -1,0 +1,74 @@
+
+\documentclass[dvipdfm]{XDBAthesis}
+% 选项说明：
+% dvipdfm  使用 dvipdfm(x) 生成最终的 PDF 文档 (缺省设置）
+% dvips    使用 dvips 生成最终的 PS 文档
+% pdftex   使用 pdfLaTeX 生成最终的 PDF 文档
+
+\usepackage{mathtools}%把公式编号改成“式（#-#）”，虽然很难看，但学院的要求二逼没办法
+\newtagform{XDBAequation}{\normalfont \normalcolor 式 (}{)}
+\usetagform{XDBAequation}
+\usepackage{url}
+\usepackage{float}
+\usepackage{subfigure}
+\usepackage{cases}
+\usepackage[ruled, vlined, algochapter]{algorithm2e}
+\renewcommand{\algorithmcfname}{算法}
+\renewcommand{\KwIn}{输入：}
+\renewcommand{\KwOut}{输出：}
+\usepackage{listings}%用于插入代码框
+\renewcommand{\lstlistingname}{代码}
+\lstset{language=Matlab}%代码语言使用的是matlab
+\lstset{breaklines}%自动将长的代码行换行排版
+\lstset{extendedchars=false}%解决代码跨页时，章节标题，页眉等汉字不显示的问题
+\lstset{% general command to set parameter(s)
+basicstyle=\small, % 设置字体大小
+keywordstyle=\color{blue}, % 设置关键字格式（颜色等等）
+identifierstyle=, % nothing happens
+commentstyle=\color{red}, % 设置注释的格式
+stringstyle=\ttfamily, % typewriter type for strings
+captionpos=b,
+frame=single,
+showstringspaces=false} % no special string spaces
+\usepackage{enumitem}
+\linespread{1.5}% 行间距1.5倍
+% \setlength{\parskip}{0.25\baselineskip}% 段间距
+% 图形文件的搜索路径
+\graphicspath{{chapter/}{figures/}}
+
+\begin{document}
+%%----------------- 封面部分 ----------------- %%
+    \class{130911}
+    \schoolnumber{13091062}
+    \title{基于掌纹和摄像头的身份认证}{技术研究}   %%题目超过14个字把剩下的放到第二个空
+    \college{软件学院}
+    \major{软件工程}
+    \author{张金辉}
+    \advisor{高海昌}
+    \maketitle
+
+%%----------------- 前言部分 ----------------- %%
+    \frontmatter
+    \include{chapter/abstract}
+    \tableofcontents
+
+%%----------------- 正文部分 ----------------- %%
+    \mainmatter
+    \pagestyle{content}
+    \include{chapter/chap-intro}
+    \include{chapter/chap-related}
+    \include{chapter/chap-my_method}
+    \include{chapter/chap-experiment}
+    \include{chapter/chap-sum}
+
+%%----------------- 附件部分 ----------------- %%
+    %\backmatter
+    \include{chapter/thanks}
+    {\zihao{5}
+    \bibliography{references}}
+    \appendix
+    %\include{chapter/appendixA}
+\end{document}
+
+
+

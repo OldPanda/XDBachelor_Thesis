@@ -1,0 +1,156 @@
+\chapter{实验结果和性能评估}
+\label{chap:experiment}
+
+在实验阶段，我们收集了来自7个人的总共120张手掌图片构成实验数据库。这些图片是由MOTO ME865型手机在不同光照及随机背景下拍摄的。手机使用的是8MP的摄像头，照片尺寸为$1840\times3264$像素，分辨率为72dpi。数据库中的图像背景包括桌面、电脑、书籍、地板、墙面等。在我们的实验中，我们用70\%的图片作为训练样本，用剩下的30\%作测试样本。本文的实验是在Intel Xeon E5440 @ 2.83GHz双核、8G内存的环境下进行的。
+\begin{figure}[H]
+    \begin{center}
+    \subfigure{\includegraphics[width=0.2\textwidth]{14.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{31.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{47.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{103.jpg}}
+    \end{center}
+    \caption{数据库中的几张示例图片} \label{fig:examples}
+\end{figure}
+在本文中，我们用\eqref{eq:accuracy}来评估算法的性能：
+\begin{equation}\label{eq:accuracy}
+  Accuracy=\frac {TP+TN}{P+N}
+\end{equation}
+对正确率的计算是以图片中的小区域为单位来进行的，每次计算一张图片上分类的正确率。其中$TP$表示我们将样本正确划分为手掌的数量，$TN$ 表示我们将样本正确划分为背景的数量。$P$ 代表目标为手掌的样本数量，即${y}_{i}=+1$；$N$代表目标为背景的样本数量，即${y}_{i}=-1$。这样，我们就可以得出每张图片的分类正确率。
+
+\section{特征分析}
+\label{sec:4_feature_analysis}
+
+在特征提取阶段，我们已经选择Laws' masks模板对图像进行滤波以得到前景和背景的纹理及模糊特征。而直接用滤波模板从图像中提取的特征不可避免的存在信息的重复，基于此，本节将对11个滤波特征进行组合分析。
+
+同时，作为机器学习问题，本文的背景去除方法需要在特征的选择和训练样本数量之间找到一个平衡，使得训练模型在过拟合和欠拟合之间找到一个折中，使得分类性能达到最佳。一般来说，样本较少，尤其是少于特征数量的时候，机器学习容易陷入过拟合，即对训练数据拟合度很好，但对测试数据拟合度很差；同样的，样本过多而特征数量过少的情况下，训练模型容易陷入欠拟合，即对训练数据和测试数据的拟合度都不是太理想。所以从这个角度分析，我们也需要对这11个特征进行调整组合实验。
+
+在本阶段，我们只使用数据库中的16张图片进行特征的组合实验，来达到一个正确率和效率上的平衡。表\ref{tab:coefficiency}给出了这11个特征之间的相关度，图\ref{fig:coefficient(t)}给出了这11个特征和目标之间的相关度的绝对值。相关度的计算公式见\eqref{eq:coef}。
+\begin{equation}\label{eq:coef}
+  R(x,y)=\frac {C(x,y)}{\sqrt{C(x,x)C(y,y)}}
+\end{equation}
+其中$C(x,y)$表示值$x$、$y$的协方差。
+\begin{table}[htbp]
+    \centering
+    \zihao{5}
+    \caption{不同特征值之间的相关度参数}
+    \label{tab:coefficiency}
+    \begin{tabular}{l|lllllllllll}
+    \toprule
+    ~  & \quad1     & \quad2     & \quad3     & \quad4     & \quad5     & \quad6     & \quad7     & \quad8     & \quad9     & \quad10    & \quad11   \\ \hline
+    1  & \ 1.00  & ~     & ~     & ~     & ~     & ~     & ~     & ~     & ~     & ~     & ~    \\
+    2  & \ 0.00  & \ 1.00  & ~     & ~     & ~     & ~     & ~     & ~     & ~     & ~     & ~    \\
+    3  & -0.02 & \ 0.70  & \ 1.00  & ~     & ~     & ~     & ~     & ~     & ~     & ~     & ~    \\
+    4  & -0.02 & \ 0.33  & \ 0.21  & \ 1.00  & ~     & ~     & ~     & ~     & ~     & ~     & ~    \\
+    5  & -0.03 & \ 0.38  & \ 0.41  & \ 0.45  & \ 1.00  & ~     & ~     & ~     & ~     & ~     & ~    \\
+    6  & -0.02 & \ 0.50  & \ 0.44  & \ 0.39  & \ 0.50  & \ 1.00  & ~     & ~     & ~     & ~     & ~    \\
+    7  & -0.03 & \ 0.18  & \ 0.18  & \ 0.59  & \ 0.42  & \ 0.30  & \ 1.00  & ~     & ~     & ~     & ~    \\
+    8  & -0.02 & \ 0.29  & \ 0.26  & \ 0.48  & \ 0.50  & \ 0.41  & \ 0.46  & \ 1.00  & ~     & ~     & ~    \\
+    9  & -0.02 & \ 0.33  & \ 0.36  & \ 0.35  & \ 0.44  & \ 0.53  & \ 0.39  & \ 0.52  & \ 1.00  & ~     & ~    \\
+    10 & -0.07 & \ 0.02  & \ 0.07  & \ 0.13  & \ 0.12  & \ 0.11  & \ 0.15  & \ 0.13  & \ 0.10  & \ 1.00  & ~    \\
+    11 & -0.04 & -0.01 & -0.07 & -0.13 & -0.12 & -0.10 & -0.15 & -0.13 & -0.10 & -0.84 & \ 1.00 \\ \bottomrule
+    \end{tabular}
+\end{table}
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{coefficient.jpg}\\
+  \caption{特征值和目标之间的相关度的绝对值}
+  \label{fig:coefficient(t)}
+\end{figure}
+结合表\ref{tab:coefficiency}和图\ref{fig:coefficient(t)}可以看出，特征1、10和11与目标的相关度要明显高于其他特征。虽然特征10 和特征11之间的相关度参数很高，达到了0.84，说明两者之间存在信息的重复，但由于两者和目标的相关度参数并不算是太高，分别只有0.659和0.732，因此考虑进行实验时两者一起使用。同时观察到特征1与目标的相关度参数要高于剩余的八特征，并且和特征10和特征11的相关度很低，说明特征1中存在对预测目标很有帮助的、但与特征10和11互补的信息，因此可以将特征1用作特征10和11的补充特征。表\ref{tab:coefficiency}显示第2个特征到第8个特征与目标的相关度参数都比较低，并且特征之间的相关度参数比较大，为了使得分类性能达到最好，这八个特征不可能同时使用。为了提高实验效率，首先我们使用最好的1、10和11特征作为基本特征，再依次和剩下的特征进行组合实验。我们选取特征的原则是采用这样一种贪心的策略：每次从剩下的特征中选取与目标的相关度参数最大的特征加入。之后将每次选择的特征进行组合，与对应的目标一起输入支持向量机进行训练，然后对测试集的图片进行预测，用\eqref{eq:accuracy}得出该特征组合的性能。图\ref{fig:feaCom}给出了我们不同特征组合实验的结果。从实验结果图中可以看出，特征组合（1、4、7、10、11）训练得到的模型有最佳的性能，因此我们选择该特征组合来进行手掌的背景去除工作。
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{feaComExp.jpg}\\
+  \caption{不同特征组合训练得到的模型性能}
+  \label{fig:feaCom}
+\end{figure}
+
+\section{区域分块实验}
+
+在\ref{subsec:3_texture&haze}部分中，我们分析从像素级来理解图像是低效的，并且只有多个像素组成的一个小区域在图像内容的展现上才有意义。同时，为了加快支持向量机算法的分类速度，以及使得一个样本中包含的信息尽可能的丰富，以增大分类置信度，我们将图像进行分块，每一块的特征向量由\eqref{eq:PatchFeature}计算得出。
+
+为了证明对区域进行分类的性能及效率，我们进行了分块与不分块的对比实验（见表\ref{tab:patchCom}）。为了简化问题，同时为了便于说明情况，这里使用1、10、11 三个特征组合来进行实验，训练样本使用手掌图像数据库中的43张图片，测试集为16张图片。
+\begin{table}[H]
+    \zihao{5}
+    \caption{分块与不分块的实验对比}
+    \label{tab:patchCom}
+    \centering
+    \begin{tabular}{ccc}
+    \toprule
+    ~&分类正确率&预测时间\\
+    \midrule
+    分块&0.913&5s\\
+    不分块&0.919&12min\\ \bottomrule
+    \end{tabular}
+\end{table}
+从表\ref{tab:patchCom}中可以看出，分块的情况下的预测时间只有5s，而不分块则达到了12min，效率上的对比是显而易见的。但与此同时分块后的分类性能略有下降，这是因为分块导致每张图片上的总样本数减少，一个样本的误分类就会导致正确率出现比较大的浮动（见\eqref{eq:accuracy}，总样本数为分母，正确分类样本数为分子）。虽然最终平均正确率下降了0.6\%，但速度上是不分块的144倍，因此在本文方法中采用分块的策略。
+
+\section{有无邻域的实验比较}
+\label{sec:4_neighbor}
+
+在第\ref{chap:my_method}章讲到了我们加入区域的邻域信息是因为图像中的一个区域是不可能独立存在的，也就是说某一区域属于手还是属于背景可以根据其邻域的特征来判断。比如说我们假设一种极端情况，某一区域的特征值由于某种意外是混乱的，
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{neighborExp.jpg}\\
+  \caption{有邻域信息和无邻域信息的情况下的性能对比}
+  \label{fig:neighborExp}
+\end{figure}
+\begin{figure}
+  \centering
+  \includegraphics[width=0.5\textwidth]{neighbor-nonneighbor.jpg}\\
+  \caption{有无邻域特征的结果对比。第一列为原图，第二列为无邻域信息的实验结果，第三列为加入邻域信息的实验结果}
+  \label{fig:neighbor-nonneighbor}
+\end{figure}\noindent 导致支持向量机模型无法正确判断其分类，或者是由于训练模型的问题，导致支持向量机模型无法对该区域正确分类，而其邻域的特征很明显并且能被正确分类，这时我们就可以根据该区域的邻域特征来预测该区域的正确分类。为了验证其性能，我们进行了相同训练样本有邻域特征和无邻域特征的对比实验。图\ref{fig:neighborExp}给出了在有邻域信息和无邻域信息的情况下的模型性能对比（16个训练样本）。
+
+根据本文的实验结果，特征向量在加入邻域的情况下的性能整体上要优于无邻域的情况。本文为了提高实验效率，选取了小样本作为支持向量机的训练输入，因此对个别图片的分类效果并不算理想，但足以说明有邻域的情况要好于无邻域的情况。在我们的测试样本中，两种情况下的分类正确率分别为91.87\%和90.37\%，看起来邻域特征在我们的问题中作用不大，但根据我们的实验结果（见图\ref{fig:neighbor-nonneighbor}），加入邻域信息的分类器预测的结果要更加精细，比如说手指缝之间的区域比较清晰，手掌边缘部分比较平滑等。而这些优势对掌纹识别的后续工作，如关键点定位，ROI的提取等非常有利，因此我们加入图片中小区域的邻域信息作为特征向量的一部分。
+
+\section{本文方法评估}
+\label{sec:4_final}
+
+为了对本文提出的方法进行评估，我们还实现了在相关工作中提到过的M.O.Rotinwa的方法\cite{rotinwa2011novel}和Doublet的方法\cite{doublet2006contact}作为对比实验。M.O.Rotinwa的方法是将每个像素点的CbCr值作为特征，输入三层含有五个隐藏节点的神经网络进行训练，再根据训练得到的模型的参数进行Kmeans分类，从而将背景去除；Doublet的方法是以每个像素的RGB值作为特征，输入三层含有三个隐藏节点的神经网络进行训练，最后用神经网络模型直接对新图像进行预测。同样地，我们使用\eqref{eq:accuracy}来评估三种方法的性能。为了比较不同数量的训练样本对分类结果的影响，我们用这三种方法对不同数量的训练集进行训练，然后分别用训练得到的样本对测试集进行预测。图\ref{fig:compareAcc}显示了这三种方法在训练样本数分别为14、28、42、56、70、84时的正确率比较。表\ref{tab:3_methods}给出了每种方法在不同数量的训练样本时的正确率。
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{compareAcc.jpg}\\
+  \caption{三种方法在不同训练集下的性能对比}
+  \label{fig:compareAcc}
+\end{figure}
+\begin{table}[htbp]
+    \zihao{5}
+    \caption{三种方法在不同训练集下的正确率}
+    \label{tab:3_methods}
+    \centering
+    \begin{tabular}{cccc}
+    \toprule
+    训练样本数 & M.O.Rotinwa的方法 & Doublet的方法 & 本文方法      \\ \midrule
+    14    & 0.822         &    0.904  &    0.920 \\
+    28    & 0.880         &    0.925  &    0.931 \\
+    42    & 0.885         &    0.933  &    0.944 \\
+    56    & 0.887         &    0.939  &    0.944 \\
+    70    & 0.891         &    0.939  &    0.945 \\
+    84    & 0.874         &    0.943  &    0.947 \\ \bottomrule
+    \end{tabular}
+\end{table}
+由图\ref{fig:compareAcc}可以看出，M.O.Rotinwa去掉了YCbCr空间中的Y分量以做到分类结果不受光照影响，但这样导致了性能的大幅下降，最后样本增加时性能反而下降，这是因为训练样本过多而特征过少，导致模型出现了高偏移。Doublet的方法在较大样本时和本文方法差距不大，但在小样本的情况下正确率却不是很高。而本文提出的方法无论训练样本的多少，正确率均在92\%以上，因此即使在小样本的情况下，本文的方法依然适用。同时根据我们得出的实验结果（见图\ref{fig:results}），用本文的方法处理的图像有更加清晰的手掌轮廓，同时对手掌之外噪点的去除也要明显优于其他两种方法。这样，即使拥有相近的正确率，本文的方法也比Doublet的方法更适于后续的ROI提取、特征匹配等，并且，由于支持向量机算法自身的特性，即使训练样本较少时，本文的方法依然保持良好的性能，因此在训练样本数量有限的情况下，本文的方法同样适用。
+\begin{figure}[htbp]
+    \begin{center}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e1.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e1-cc.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e1-rgb.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e1-me.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e2.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e2-cc.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e2-rgb.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e2-me.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e3.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e3-cc.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e3-rgb.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e3-me.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e4.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e4-cc.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e4-rgb.jpg}}
+    \subfigure{\includegraphics[width=0.2\textwidth]{e4-me.jpg}}
+    \end{center}
+    \caption{背景去除的结果。其中第一列为原图，第二列为M.O.Rotinwa的方法的结果，第三列为Doublet的方法的结果，第四列为本文方法的结果} \label{fig:results}
+\end{figure}
+\section{本章小结}
+
+本章列出并总结了本文研究过程中的实验结果：特征组合实验、有无邻域特征的对比实验和本文方法与其他方法的对比实验。从目前研究的结果来看，本文的方法成功解决了复杂背景对掌纹识别的干扰，可以清晰的从变化的外界环境中将掌形分离出来，同时本文方法对手掌图像的获取方式没有特殊要求，使用普通的手机或者平板电脑即可做到，这对掌纹识别技术在人们日常生活中普及、更有力的保障人们的信息安全具有重大意义。
